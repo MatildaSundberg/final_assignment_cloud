@@ -20,8 +20,7 @@ sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "FLUSH PRIVILEGES;"
 
 # Configure MySQL as a replication slave
 echo "Configuring MySQL as a replica..."
-sudo mkdir -p /var/log/mysql
-sudo chown mysql:mysql /var/log/mysql
+sudo sed -i '/bind-address/d' /etc/mysql/mysql.conf.d/mysqld.cnf
 sudo sed -i '/\[mysqld\]/a bind-address = 0.0.0.0\nlog_bin = /var/log/mysql/mysql-bin.log\nserver-id = 2\nbinlog_do_db = sakila' /etc/mysql/mysql.conf.d/mysqld.cnf #TODO: change server-id to random number 
 
 # Restart MySQL to apply configuration changes
@@ -53,7 +52,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-#rm -rf sakila-db.tar.gz sakila-db
+rm -rf sakila-db.tar.gz sakila-db
 
 # Check if MySQL restarted successfully
 if ! sudo systemctl is-active --quiet mysql; then
@@ -62,13 +61,8 @@ if ! sudo systemctl is-active --quiet mysql; then
 fi
 
 # Set up replication from the master
-MANAGER_IP="YOUR_MANAGER_IP_HERE"  # Replace with the actual manager IP
 REPLICATION_USER="replicator"
 REPLICATION_PASSWORD="12345hi"
-MASTER_LOG_FILE="mysql-bin.000001"  # Adjust this based on manager instance logs
-MASTER_LOG_POS=1361281  # Adjust this based on manager instance logs
-
-
 
 # Start replication
 echo "Starting replication..."

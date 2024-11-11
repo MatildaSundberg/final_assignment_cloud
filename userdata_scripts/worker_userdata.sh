@@ -9,7 +9,7 @@ sudo systemctl start mysql
 sudo systemctl enable mysql
 
 # Secure MySQL installation
-MYSQL_ROOT_PASSWORD="12345hej"  # Set your root password
+MYSQL_ROOT_PASSWORD="12345hej"
 echo "Securing MySQL installation..."
 sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH 'mysql_native_password' BY '$MYSQL_ROOT_PASSWORD';"
 sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "FLUSH PRIVILEGES;"
@@ -20,8 +20,9 @@ sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "FLUSH PRIVILEGES;"
 
 # Configure MySQL as a replication slave
 echo "Configuring MySQL as a replica..."
+RANDOM_SERVER_ID=$((RANDOM + 1))
 sudo sed -i '/bind-address/d' /etc/mysql/mysql.conf.d/mysqld.cnf
-sudo sed -i '/\[mysqld\]/a bind-address = 0.0.0.0\nlog_bin = /var/log/mysql/mysql-bin.log\nserver-id = 2\nbinlog_do_db = sakila' /etc/mysql/mysql.conf.d/mysqld.cnf #TODO: change server-id to random number 
+sudo sed -i "/\[mysqld\]/a bind-address = 0.0.0.0\nlog_bin = /var/log/mysql/mysql-bin.log\nserver-id = $RANDOM_SERVER_ID\nbinlog_do_db = sakila" /etc/mysql/mysql.conf.d/mysqld.cnf
 
 # Restart MySQL to apply configuration changes
 sudo systemctl restart mysql

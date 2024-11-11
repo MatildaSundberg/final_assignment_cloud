@@ -8,5 +8,7 @@ aws_folder_path = "/Users/matildasundberg/.aws"
 key_pair_name = "A2_key_name"
 security_group_name = "A2-securitygroup-name"
 
+mysql_root_password = "12345hej"
+
 
 

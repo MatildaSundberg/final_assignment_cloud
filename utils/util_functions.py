@@ -196,3 +196,23 @@ def get_orchestrator_instance_ip():
     
     print("No running orchestrator-instance found or the instance does not have a public IP address.")
     return None
+
+def get_instance_ips(name):
+    ec2 = boto3.client('ec2')
+    # Describe all running EC2 instances with the 'orchestrator-instance' tag
+    response = ec2.describe_instances(
+        Filters=[
+            {
+                'Name': 'tag:Name',  # Filter by the 'Name' tag
+                'Values': [name] 
+            },
+            {
+                'Name': 'instance-state-name',
+                'Values': ['running']  # Only running instances
+            }
+        ]
+    )
+    instance = response['Reservations'][0]['Instances'][0]
+    public_ip = instance.get('PublicIpAddress')
+    private_ip = instance.get('PrivateIpAddress')
+    return private_ip, public_ip

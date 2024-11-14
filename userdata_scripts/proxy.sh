@@ -30,6 +30,30 @@ async def receive_message(data: dict):
     # Respond back with a confirmation
     return {"response": "Message received by Proxy", "original_message": data["message"]}
 
+@app.post("/directhit")
+async def direct_hit(data: dict):
+    if "message" not in data:
+        raise HTTPException(status_code=400, detail="Invalid message")
+
+    # Respond back with a confirmation
+    return {"response": "Direct hit message received by Proxy", "original_message": data["message"]}
+
+@app.post("/random")
+async def random_request(data: dict):
+    if "message" not in data:
+        raise HTTPException(status_code=400, detail="Invalid message")
+
+    # Respond back with a confirmation
+    return {"response": "Random message received by Proxy", "original_message": data["message"]}
+
+@app.post("/custom")
+async def custom_request(data: dict):
+    if "message" not in data:
+        raise HTTPException(status_code=400, detail="Invalid message")
+
+    # Respond back with a confirmation
+    return {"response": "Custom message received by Proxy", "original_message": data["message"]}
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5002)
 EOF

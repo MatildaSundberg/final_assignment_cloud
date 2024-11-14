@@ -5,6 +5,7 @@ import boto3
 import paramiko
 from utils import instance_setup as i
 import globals as g
+from utils import util_functions as u
 
 if __name__ == "__main__":
     pem_file_path = g.pem_file_path
@@ -53,15 +54,14 @@ if __name__ == "__main__":
     print("Waiting for manager instance to initialize...")
     time.sleep(120)
 
-    # Retrieve and display public IPs for SSH access
-    manager_instance.load()
-    manager_ip = manager_instance.private_ip_address
-    print(f"Manager instance IP: {manager_ip}")
+
+    manager_private_ip, manager_public_ip  = u.get_instance_ips('MySQL-Manager')
+    print(f"Manager instance IP: {manager_private_ip}")
 
     # SSH into the manager instance to retrieve MASTER_LOG_FILE and MASTER_LOG_POS
     with paramiko.SSHClient() as ssh:
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(manager_instance.public_ip_address, username='ubuntu', key_filename=pem_file_path)
+        ssh.connect(manager_public_ip, username='ubuntu', key_filename=pem_file_path)
         
         # Create a .my.cnf file to securely store MySQL credentials in the ubuntu user's home directory
         ssh.exec_command(f'''
@@ -94,7 +94,7 @@ if __name__ == "__main__":
     print(f"Retrieved MASTER_LOG_FILE: {master_log_file}, MASTER_LOG_POS: {master_log_pos}")
 
     # Update worker user data with retrieved information
-    worker_user_data = worker_user_data.replace('$MANAGER_IP', manager_ip)
+    worker_user_data = worker_user_data.replace('$MANAGER_IP', manager_private_ip)
     worker_user_data = worker_user_data.replace('$MASTER_LOG_FILE', master_log_file)
     worker_user_data = worker_user_data.replace('$MASTER_LOG_POS', master_log_pos)
 
@@ -104,3 +104,5 @@ if __name__ == "__main__":
     )
 
     print("Worker instances created.")
+
+    # time error??

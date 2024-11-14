@@ -216,3 +216,46 @@ def get_instance_ips(name):
     public_ip = instance.get('PublicIpAddress')
     private_ip = instance.get('PrivateIpAddress')
     return private_ip, public_ip
+
+
+def retrieve_master_status(ssh, mysql_root_password):
+    """
+    Retrieve the master status from a MySQL server over SSH.
+
+    Parameters:
+    ssh (paramiko.SSHClient): The SSH client connected to the MySQL server.
+    mysql_root_password (str): The MySQL root password.
+
+    Returns:
+    tuple: A tuple containing MASTER_LOG_FILE and MASTER_LOG_POS.
+           Returns (None, None) if an error occurs.
+    """
+    command = f"sudo mysql -u root -p'{mysql_root_password}' --skip-column-names -e \"SHOW MASTER STATUS\\G\""
+    try:
+        # Execute the command on the remote server
+        stdin, stdout, stderr = ssh.exec_command(command)
+        output = stdout.read().decode()
+        error = stderr.read().decode()
+
+        # Check for errors in MySQL output
+        if error:
+            print(f"Error retrieving master status: {error}")
+            return None, None
+
+        # Initialize variables to store the log file and position
+        master_log_file = ""
+        master_log_pos = ""
+
+        # Parse the output for MASTER_LOG_FILE and MASTER_LOG_POS
+        for line in output.splitlines():
+            if "File:" in line:
+                master_log_file = line.split(":")[1].strip()
+            elif "Position:" in line:
+                master_log_pos = line.split(":")[1].strip()
+
+        print(f"Retrieved MASTER_LOG_FILE: {master_log_file}, MASTER_LOG_POS: {master_log_pos}")
+        return master_log_file, master_log_pos
+
+    except Exception as e:
+        print(f"Exception retrieving master status: {e}")
+        return None, None

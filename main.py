@@ -34,53 +34,69 @@ if __name__ == "__main__":
         pem_file.write(key_pair.key_material)
     os.chmod(pem_file_path, stat.S_IRUSR)  # Change file permissions to 400 to protect the private key
 
-    # Load user data scripts for manager and workers
+    # Read user data scripts from files
     with open('userdata_scripts/manager.sh', 'r') as file:
         manager_user_data = file.read()
     with open('userdata_scripts/worker_userdata.sh', 'r') as file:
         worker_user_data = file.read()
+    with open('userdata_scripts/gatekeeper.sh', 'r') as file:
+        gatekeeper_user_data = file.read()
+    with open('userdata_scripts/trusted_host.sh', 'r') as file:
+        trusted_host_user_data = file.read()
+    with open('userdata_scripts/proxy.sh', 'r') as file:
+        proxy_user_data = file.read()
 
     # Create security group for instances
     security_group_id = i.createSecurityGroup(vpc_id, g.security_group_name)
 
     print("Creating instances...")
 
-    # Launch manager instance
+    # Launch instances
     manager_instance = i.createInstance(
         't2.large', 1, 1, key_pair, security_group_id, subnet_id, manager_user_data, "MySQL-Manager"
     )[0]
 
+    gatekeeper_instance = i.createInstance(
+        't2.large', 1, 1, key_pair, security_group_id, subnet_id, gatekeeper_user_data, "Gatekeeper"
+    )[0]
+
+    trustedhost_instance = i.createInstance(
+        't2.large', 1, 1, key_pair, security_group_id, subnet_id, trusted_host_user_data, "Trusted-Host"
+    )[0]
+
+    proxy_instance = i.createInstance(
+        't2.large', 1, 1, key_pair, security_group_id, subnet_id, proxy_user_data, "Proxy"
+    )[0]
+
     # Wait for manager instance to initialize
-    print("Waiting for manager instance to initialize...")
-    time.sleep(120)
+    print("Waiting for instances to initialize...")
+    time.sleep(240)
 
-
+    gatekeeper_private_ip, gatekeeper_public_ip = u.get_instance_ips('Gatekeeper')
+    trusted_host_private_ip, trusted_host_public_ip = u.get_instance_ips('Trusted-Host')
+    proxy_private_ip, proxy_public_ip = u.get_instance_ips('Proxy')
     manager_private_ip, manager_public_ip  = u.get_instance_ips('MySQL-Manager')
+
     print(f"Manager instance IP: {manager_private_ip}")
 
     # SSH into the manager instance to retrieve MASTER_LOG_FILE and MASTER_LOG_POS
     with paramiko.SSHClient() as ssh:
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(manager_public_ip, username='ubuntu', key_filename=pem_file_path)
-        
-        # Create a .my.cnf file to securely store MySQL credentials in the ubuntu user's home directory
-        ssh.exec_command(f'''
-            echo "[client]
-            user=root
-            password={MYSQL_ROOT_PASSWORD}" | tee /home/ubuntu/.my.cnf > /dev/null
-            chmod 600 /home/ubuntu/.my.cnf
-        ''')
+    
+        # Store MySQL credentials in .my.cnf file securely
+        command = f"echo -e '[client]\\nuser=root\\npassword={MYSQL_ROOT_PASSWORD}' > /home/ubuntu/.my.cnf && chmod 600 /home/ubuntu/.my.cnf"
+        ssh.exec_command(command)
 
-        # Run command to retrieve log file and position using .my.cnf credentials
-        stdin, stdout, stderr = ssh.exec_command("mysql --defaults-file=/home/ubuntu/.my.cnf -e \"SHOW MASTER STATUS\\G\"")
+        # Run command to retrieve log file and position
+        stdin, stdout, stderr = ssh.exec_command("mysql --defaults-file=/home/ubuntu/.my.cnf -e 'SHOW MASTER STATUS\\G'")
+    
         output = stdout.read().decode()
         error = stderr.read().decode()
 
         if error:
             print(f"Error retrieving master status: {error}")
-            ssh.close()
             exit(1)
-        ssh.close()
 
     # Parse output to get MASTER_LOG_FILE and MASTER_LOG_POS
     master_log_file = ""
@@ -98,11 +114,80 @@ if __name__ == "__main__":
     worker_user_data = worker_user_data.replace('$MASTER_LOG_FILE', master_log_file)
     worker_user_data = worker_user_data.replace('$MASTER_LOG_POS', master_log_pos)
 
+    time.sleep(120)
+
     # Launch worker instances
     worker_instances = i.createInstance(
-        't2.large', 2, 2, key_pair, security_group_id, subnet_id, worker_user_data, "MySQL-Worker"
+        't2.large', 1, 1, key_pair, security_group_id, subnet_id, worker_user_data, "MySQL-Worker-1"
     )
+    worker_instances = i.createInstance(
+        't2.large', 1, 1, key_pair, security_group_id, subnet_id, worker_user_data, "MySQL-Worker-2"
+    )
+    time.sleep(60)
+
+    worker_1_private_ip, worker_1_public_ip = u.get_instance_ips('MySQL-Worker-1')
+    worker_2_private_ip, worker_2_public_ip = u.get_instance_ips('MySQL-Worker-2')
+
+    time.sleep(60)
+
 
     print("Worker instances created.")
 
-    # time error??
+    print(f"Gate IP: {gatekeeper_public_ip}")
+    print(f"Trusted Host IP: {trusted_host_public_ip}")
+    print(f"Proxy IP: {proxy_public_ip}")
+
+    #Set up `config.json` on the Gatekeeper instance with the IPs of Trusted Host and Proxy
+    u.ssh_and_run_command(
+        gatekeeper_public_ip, pem_file_path,
+        f"echo '{{\"TRUSTED_HOST_PRIVATE_IP\": \"{trusted_host_private_ip}\", \"PROXY_PRIVATE_IP\": \"{proxy_private_ip}\"}}' > config.json"
+    )
+
+    # Set up `config.json` on the Trusted Host instance with the IP of the Proxy
+    u.ssh_and_run_command(
+        trusted_host_public_ip, pem_file_path,
+        f"echo '{{\"PROXY_PRIVATE_IP\": \"{proxy_private_ip}\", \"GATEKEEPER\": \"{gatekeeper_private_ip}\"}}' > config.json"
+    )
+
+    # Set up `config.json` on the .. instance with the IP of the Proxy
+    u.ssh_and_run_command(
+        proxy_public_ip, pem_file_path,
+        f"echo '{{\"WORKER_1_PRIVATE_IP\": \"{worker_1_private_ip}\", \"WORKER_2_PRIVATE_IP\": \"{worker_2_private_ip}\", \"MANAGER_PRIVATE_IP\": \"{manager_private_ip}\"}}' > config.json"
+    )
+
+    time.sleep(120)
+
+
+    # Start running .py files
+    u.ssh_and_run_command(
+        gatekeeper_public_ip, pem_file_path,
+        "nohup python3 gatekeeper.py > log.txt 2>&1 &"
+    )
+
+    u.ssh_and_run_command(
+        trusted_host_public_ip, pem_file_path,
+        "nohup python3 trusted_host.py > log.txt 2>&1 &"
+    )
+
+    u.ssh_and_run_command(
+        proxy_public_ip, pem_file_path,
+        "nohup python3 proxy.py > log.txt 2>&1 &"
+    )
+
+    u.ssh_and_run_command(
+        worker_1_public_ip, pem_file_path,
+        "nohup python3 worker.py > log.txt 2>&1 &"
+    )
+
+    u.ssh_and_run_command(
+        worker_2_public_ip, pem_file_path,
+        "nohup python3 worker.py > log.txt 2>&1 &"
+    ) 
+
+    u.ssh_and_run_command(
+        manager_public_ip, pem_file_path,
+        "nohup python3 manager.py > log.txt 2>&1 &"
+    )
+
+    time.sleep(120)
+

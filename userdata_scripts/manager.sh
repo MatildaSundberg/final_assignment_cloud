@@ -5,6 +5,9 @@ echo "Updating package list and installing MySQL server..."
 sudo apt update -y
 sudo apt install -y mysql-server python3-pip
 
+# Install FastAPI, Uvicorn, and Requests with permission to override the restriction
+sudo pip3 install fastapi uvicorn requests mysql-connector-python --break-system-packages
+
 sudo systemctl start mysql
 sudo systemctl enable mysql
 
@@ -78,3 +81,76 @@ fi
 rm -rf sakila-db.tar.gz sakila-db
 
 echo "Setup completed successfully."
+
+# Write the FastAPI application to manager.py in the current directory
+cat << EOF > /home/ubuntu/manager.py
+from fastapi import FastAPI, HTTPException
+import uvicorn
+import mysql.connector
+from mysql.connector import Error
+import json
+import requests
+
+
+app = FastAPI()
+
+db_config = {
+    "host": "localhost",
+    "user": "root",
+    "password": "$MYSQL_ROOT_PASSWORD",
+    "database": "sakila"
+}
+
+def get_db_connection():
+    try:
+        connection = mysql.connector.connect(**db_config)
+        return connection
+    except Error as e:
+        print(f"Error connecting to MySQL: {e}")
+        return None
+
+@app.post("/read")
+async def read_operation(data: dict):
+    if "query" not in data:
+        raise HTTPException(status_code=400, detail="Invalid request: 'query' is required")
+
+    connection = get_db_connection()
+    if not connection:
+        raise HTTPException(status_code=500, detail="Database connection error")
+
+    try:
+        cursor = connection.cursor(dictionary=True)
+        # Execute the read query from the request
+        cursor.execute(data["query"])
+        results = cursor.fetchall()
+        return {"status": "success", "data": results}
+    except Error as e:
+        raise HTTPException(status_code=500, detail=f"Database query error: {e}")
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.post("/write")
+async def write_operation(data: dict):
+    if "query" not in data:
+        raise HTTPException(status_code=400, detail="Invalid request: 'query' is required")
+
+    connection = get_db_connection()
+    if not connection:
+        raise HTTPException(status_code=500, detail="Database connection error")
+
+    try:
+        cursor = connection.cursor()
+        # Execute the write query from the request
+        cursor.execute(data["query"])
+        connection.commit()
+        return {"status": "success", "data": "Write operation completed"}
+    except Error as e:
+        raise HTTPException(status_code=500, detail=f"Database write error: {e}")
+    finally:
+        cursor.close()
+        connection.close()
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=5003)
+EOF

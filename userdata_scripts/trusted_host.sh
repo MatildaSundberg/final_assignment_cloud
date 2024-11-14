@@ -8,17 +8,22 @@ sudo apt install -y python3 python3-pip
 # Install FastAPI, Uvicorn, and Requests with permission to override restrictions
 sudo pip3 install fastapi uvicorn requests --break-system-packages
 
+
 # Create the Trusted Host FastAPI app in the current directory as trusted_host.py
 cat << EOF > /home/ubuntu/trusted_host.py
 from fastapi import FastAPI, HTTPException
 import requests
 import uvicorn
-import os
+import json
+
+# Load configuration from config.json
+with open('config.json') as config_file:
+    config = json.load(config_file)
+
+proxy_private_ip = config.get("PROXY_PRIVATE_IP")
+PROXY_URL = f"http://{proxy_private_ip}:5002/receive"
 
 app = FastAPI()
-
-PROXY_PRIVATE_IP = os.getenv("PROXY_PRIVATE_IP")
-PROXY_URL = "http://$PROXY_PRIVATE_IP:5002/receive"
 
 @app.post("/receive")
 async def receive_message(data: dict):
@@ -35,9 +40,3 @@ async def receive_message(data: dict):
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5001)
 EOF
-
-# Install screen to run the app in the background
-sudo apt install -y screen
-
-# Run the Trusted Host FastAPI app with Uvicorn in a detached screen session
-screen -dmS trusted_host uvicorn /home/ubuntu/trusted_host:app --host 0.0.0.0 --port 5001

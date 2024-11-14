@@ -9,20 +9,23 @@ sudo apt install -y python3 python3-pip
 sudo pip3 install fastapi uvicorn requests --break-system-packages
 
 
-
-
 # Write the FastAPI application to gatekeeper.py in the current directory
 cat << EOF > /home/ubuntu/gatekeeper.py
 from fastapi import FastAPI, HTTPException
 import requests
 import uvicorn
-import os
+import json
+
+# Load configuration from config.json
+with open('config.json') as config_file:
+    config = json.load(config_file)
+
+trusted_host_private_ip = config.get("TRUSTED_HOST_PRIVATE_IP")
+print("trusted_host_private_ip: ", trusted_host_private_ip)
+TRUSTED_HOST_URL = f"http://{trusted_host_private_ip}:5001/receive"
 
 app = FastAPI()
 
-TRUSTED_HOST_PRIVATE_IP = os.getenv("TRUSTED_HOST_PRIVATE_IP")
-
-TRUSTED_HOST_URL = "http://$TRUSTED_HOST_PRIVATE_IP:5001/receive"
 
 @app.post("/send")
 async def send_message(data: dict):
@@ -41,10 +44,3 @@ async def send_message(data: dict):
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)
 EOF
-
-# Install screen to run the app in the background
-sudo apt install -y screen
-
-# Run the Gatekeeper FastAPI app with Uvicorn in a detached screen session
-screen -dmS gatekeeper uvicorn home/ubuntu/gatekeeper:app --host 0.0.0.0 --port 5000
-# no hup uvicorn home/ubuntu/gatekeeper:app --host??

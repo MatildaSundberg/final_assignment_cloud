@@ -123,6 +123,7 @@ async def read_operation(data: dict):
         # Execute the read query from the request
         cursor.execute(data["query"])
         results = cursor.fetchall()
+        print(results)
         return {"status": "success", "data": results}
     except Error as e:
         raise HTTPException(status_code=500, detail=f"Database query error: {e}")

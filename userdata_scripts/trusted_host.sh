@@ -28,6 +28,7 @@ app = FastAPI()
 async def direct_hit(data: dict):
     response = requests.post(f"http://{proxy_private_ip}:5002/directhit", json=data)
     if response.status_code != 200:
+        print(response.text)
         raise HTTPException(status_code=response.status_code, detail="Failed to forward direct hit to Proxy")
     return response.json()
 

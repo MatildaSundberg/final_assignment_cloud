@@ -58,9 +58,11 @@ async def direct_hit(data: dict):
         elif operation == "write":
             response = requests.post(f"http://{manager_private_ip}:5003/write", json=data)
         else:
+            print(f"Invalid operation type: {operation}")
             raise HTTPException(status_code=400, detail="Invalid operation type")
 
         response.raise_for_status()
+        print(response.json())
         return response.json()
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Failed to forward request to Manager: {e}")
@@ -102,7 +104,7 @@ async def custom_request(data: dict):
         response.raise_for_status()
         return response.json()  # Return the response from the selected worker
     except requests.RequestException as e:
-    raise HTTPException(status_code=500, detail=f"Failed to forward request to Worker: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to forward request to Worker: {e}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5002)

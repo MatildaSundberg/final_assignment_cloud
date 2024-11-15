@@ -49,6 +49,7 @@ async def direct_hit(data: dict):
     validate_request(data)  # Validate the incoming request
     response = requests.post(f"http://{trusted_host_private_ip}:5001/directhit", json={"type": "directhit", **data})
     if response.status_code != 200:
+        print(response.text)
         raise HTTPException(status_code=response.status_code, detail="Failed to send direct hit message")
     return response.json()
 

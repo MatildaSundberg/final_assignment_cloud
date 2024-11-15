@@ -217,6 +217,26 @@ def get_instance_ips(name):
     private_ip = instance.get('PrivateIpAddress')
     return private_ip, public_ip
 
+def retrieve_instance_id(name):
+    ec2 = boto3.client('ec2')
+
+    response = ec2.describe_instances(
+        Filters=[
+            {
+                'Name': 'tag:Name',  # Filter by the 'Name' tag
+                'Values': [name] 
+            },
+            {
+                'Name': 'instance-state-name',
+                'Values': ['running']  # Only running instances
+            }
+        ]
+    )
+    instance = response['Reservations'][0]['Instances'][0]
+    instance_id = instance.get('InstanceId')
+    return instance_id
+
+
 
 def retrieve_master_status(ssh, mysql_root_password):
     """

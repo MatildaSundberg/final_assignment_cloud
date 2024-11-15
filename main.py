@@ -189,5 +189,14 @@ if __name__ == "__main__":
         "nohup python3 manager.py > log.txt 2>&1 &"
     )
 
-    time.sleep(120)
+    time.sleep(240)
+
+    manager_instance_id = u.retrieve_instance_id('MySQL-Manager')
+    worker_instance_id = u.retrieve_instance_id('MySQL-Worker-1')
+    worker_2_instance_id = u.retrieve_instance_id('MySQL-Worker-2')
+    trustedhost_instance_id = u.retrieve_instance_id('Trusted-Host')
+    proxy_instance_id = u.retrieve_instance_id('Proxy')
+
+    private_sg = i.create_private_security_group(vpc_id, g.security_group_name2, security_group_id)                          
+    i.update_instance_security_groups([manager_instance_id, trustedhost_instance_id, proxy_instance_id, worker_instance_id, worker_2_instance_id], [security_group_id])
 

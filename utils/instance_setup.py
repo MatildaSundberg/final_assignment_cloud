@@ -80,8 +80,56 @@ def createSecurityGroup(vpc_id: str, group_name: str):
             },
         ]
     )
-
     return security_group_id
+
+def update_instance_security_groups(instance_ids, security_group_ids):
+    ec2 = boto3.client('ec2')
+
+    for instance_id in instance_ids:
+        ec2.modify_instance_attribute(
+            InstanceId=instance_id,
+            Groups=security_group_ids
+        )
+        print(f"Updated instance {instance_id} with security groups: {security_group_ids}")
+
+
+def create_private_security_group(vpc_id: str, group_name: str, public_sg_id: str):
+    ec2 = boto3.resource('ec2')
+
+    # Create the private security group
+    response = ec2.create_security_group(
+        GroupName=group_name,
+        Description='Private security group for internal communication on port 5001',
+        VpcId=vpc_id
+    )
+    private_sg_id = response.group_id
+    print(f'Private Security Group Created {private_sg_id} in vpc {vpc_id}.')
+
+    ec2.SecurityGroup(private_sg_id).authorize_ingress(
+        IpPermissions=[
+            {
+                'IpProtocol': 'tcp',
+                'FromPort': 5001,
+                'ToPort': 5001,
+                'UserIdGroupPairs': [{'GroupId': public_sg_id}]
+            },
+            {
+                'IpProtocol': 'tcp',
+                'FromPort': 5002,
+                'ToPort': 5003,
+                'UserIdGroupPairs': [{'GroupId': private_sg_id}]
+            },
+           {
+                'IpProtocol': 'tcp',
+                'FromPort': 3306,
+                'ToPort': 3306,
+                'UserIdGroupPairs': [{'GroupId': private_sg_id}]
+            },
+        ]
+    )
+    return private_sg_id
+
+
 
 '''
 Description: Creates an EC2 instance with the specified parameters and waits for it to enter the running state.
@@ -125,6 +173,8 @@ def createInstance(instanceType: str, minCount: int, maxCount: int, key_pair, se
             ]
     )
 
+    
+
     # Wait until the instances are running
     for instance in instances:
         print(f"Waiting for instance {instance.id} to enter running state...")
@@ -135,3 +185,28 @@ def createInstance(instanceType: str, minCount: int, maxCount: int, key_pair, se
         instance.create_tags(Tags=[{'Key': 'Name', 'Value': instance_name}])
     
     return instances
+
+def updateInstanceUserData(instance_id, user_data):
+    ec2_client = boto3.client('ec2')
+    ec2_client.modify_instance_attribute(
+        InstanceId=instance_id,
+        UserData={
+            'Value': user_data
+        }
+    )
+    print(f"Updated user data for instance {instance_id}")
+
+def restartInstance(instance_id):
+    ec2_client = boto3.client('ec2')
+    ec2_client.reboot_instances(InstanceIds=[instance_id])
+    print(f"Restarted instance {instance_id}")
+
+def stopInstance(instance_id):
+    ec2_client = boto3.client('ec2')
+    ec2_client.stop_instances(InstanceIds=[instance_id])
+    print(f"Stopped instance {instance_id}")
+
+def startInstance(instance_id):
+    ec2_client = boto3.client('ec2')
+    ec2_client.start_instances(InstanceIds=[instance_id])
+    print(f"Started instance {instance_id}")

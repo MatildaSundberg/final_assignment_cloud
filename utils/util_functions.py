@@ -135,6 +135,58 @@ def transfer_file_to_ec2(instance_id, file_path, destination_path, key_path, use
     except Exception as e:
         print(f"Error occurred during file transfer: {str(e)}")
 
+def transfer_file_from_ec2(instance_id, remote_path, local_path, key_path, username='ubuntu'):
+    """
+    Transfer a file from an EC2 instance to the local machine via SFTP.
+
+    :param instance_id: EC2 instance ID
+    :param remote_path: Path to the file on the EC2 instance
+    :param local_path: Path to save the file locally
+    :param key_path: Path to the private key file (e.g., .pem file) for SSH authentication
+    :param username: Username for the EC2 instance (default: 'ubuntu')
+    """
+    try:
+        # Initialize EC2 resource
+        ec2 = boto3.client('ec2')
+        
+        # Get the public DNS or IP address of the EC2 instance
+        response = ec2.describe_instances(InstanceIds=[instance_id])
+        instance_info = response['Reservations'][0]['Instances'][0]
+        public_ip = instance_info.get('PublicIpAddress') or instance_info.get('PublicDnsName')
+
+        print(f"Public IP: {public_ip}")
+
+        if not public_ip:
+            raise ValueError("Instance does not have a public IP or DNS")
+
+        # Initialize the SSH client
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        # Load the private key
+        private_key = paramiko.RSAKey.from_private_key_file(key_path)
+
+        # Connect to the EC2 instance
+        print(f"Connecting to EC2 instance {instance_id} at {public_ip}...")
+        ssh.connect(hostname=public_ip, username=username, pkey=private_key)
+
+        # Open SFTP session
+        sftp = ssh.open_sftp()
+
+        # Transfer the file
+        print(f"Downloading {remote_path} from EC2 instance to {local_path}...")
+        sftp.get(remote_path, local_path)
+
+        # Close the SFTP session and SSH connection
+        sftp.close()
+        ssh.close()
+
+        print("File transfer successful!")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+
 
 def get_orchestrator_instance_id():
     # Initialize the EC2 client

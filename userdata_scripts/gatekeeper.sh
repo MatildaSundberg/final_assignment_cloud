@@ -51,7 +51,8 @@ async def direct_hit(data: dict):
     if response.status_code != 200:
         print(response.text)
         raise HTTPException(status_code=response.status_code, detail="Failed to send direct hit message")
-    return response.json()
+    return {f"/directhit: {response.json()}"}
+
 
 @app.post("/random")
 async def random_request(data: dict):
@@ -59,7 +60,7 @@ async def random_request(data: dict):
     response = requests.post(f"http://{trusted_host_private_ip}:5001/random", json={"type": "random", **data})
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail="Failed to send random request")
-    return response.json()
+    return {f"/random: {response.json()}"}
 
 @app.post("/custom")
 async def custom_request(data: dict):
@@ -67,7 +68,7 @@ async def custom_request(data: dict):
     response = requests.post(f"http://{trusted_host_private_ip}:5001/custom", json={"type": "custom", **data})
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail="Failed to send custom request")
-    return response.json()
+    return {f"/custom: {response.json()}"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)

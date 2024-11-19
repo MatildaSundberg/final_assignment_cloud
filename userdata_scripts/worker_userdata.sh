@@ -4,6 +4,8 @@
 echo "Updating package list and installing MySQL server..."
 sudo apt update -y
 sudo apt install -y mysql-server python3-pip
+sudo apt-get update
+sudo apt-get install -y sysbench
 
 # Install FastAPI, Uvicorn, and Requests with permission to override the restriction
 sudo pip3 install fastapi uvicorn requests mysql-connector-python --break-system-packages
@@ -76,6 +78,9 @@ sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "START SLAVE;"
 # Confirm replication status
 echo "Checking replication status..."
 sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "SHOW SLAVE STATUS\G"
+
+# Run the benchmark and save results to a file
+#sudo sysbench /usr/share/sysbench/oltp_read_only.lua --mysql-db=sakila --mysql-user=root --mysql-password=$MYSQL_ROOT_PASSWORD run > sysbench_results_worker.txt
 
 # Write the FastAPI application to manager.py in the current directory
 cat << EOF > /home/ubuntu/worker.py

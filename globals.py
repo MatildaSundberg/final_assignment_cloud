@@ -7,6 +7,7 @@ aws_folder_path = "/Users/matildasundberg/.aws"
 # Names can only contain characters that are alphanumeric characters and hyphens(-)
 key_pair_name = "A2_key_name"
 security_group_name = "A2-securitygroup-name"
+security_group_name2 = "A2-securitygroup-name2"
 
 mysql_root_password = "12345hej"
 

@@ -7,6 +7,9 @@ from utils import instance_setup as i
 import globals as g
 from utils import util_functions as u
 
+import logging
+logging.getLogger("paramiko").setLevel(logging.CRITICAL)
+
 if __name__ == "__main__":
     pem_file_path = g.pem_file_path
     MYSQL_ROOT_PASSWORD = g.mysql_root_password
@@ -191,12 +194,46 @@ if __name__ == "__main__":
 
     time.sleep(240)
 
+    u.ssh_and_run_command(
+        manager_public_ip, pem_file_path,
+        f"sudo sysbench /usr/share/sysbench/oltp_read_only.lua --mysql-db=sakila --mysql-user=root --mysql-password={MYSQL_ROOT_PASSWORD} run > sysbench_results_manager.txt"
+    )
+    u.ssh_and_run_command(
+        worker_1_public_ip, pem_file_path,
+        f"sudo sysbench /usr/share/sysbench/oltp_read_only.lua --mysql-db=sakila --mysql-user=root --mysql-password={MYSQL_ROOT_PASSWORD} run > sysbench_results_worker.txt"
+    )
+    u.ssh_and_run_command(
+        worker_2_public_ip, pem_file_path,
+        f"sudo sysbench /usr/share/sysbench/oltp_read_only.lua --mysql-db=sakila --mysql-user=root --mysql-password={MYSQL_ROOT_PASSWORD} run > sysbench_results_worker.txt"
+    )
+
+    time.sleep(100)
+
     manager_instance_id = u.retrieve_instance_id('MySQL-Manager')
     worker_instance_id = u.retrieve_instance_id('MySQL-Worker-1')
     worker_2_instance_id = u.retrieve_instance_id('MySQL-Worker-2')
     trustedhost_instance_id = u.retrieve_instance_id('Trusted-Host')
     proxy_instance_id = u.retrieve_instance_id('Proxy')
 
-    private_sg = i.create_private_security_group(vpc_id, g.security_group_name2, security_group_id)                          
-    i.update_instance_security_groups([manager_instance_id, trustedhost_instance_id, proxy_instance_id, worker_instance_id, worker_2_instance_id], [security_group_id])
+
+    sysbench_dir = "./sysbench"
+
+    manager_file_path = os.path.join(sysbench_dir, "manager.txt")
+    worker_file_path = os.path.join(sysbench_dir, "worker.txt")
+    worker_2_file_path = os.path.join(sysbench_dir, "worker_2.txt")
+
+    # Ensure sysbench directory exists
+    if not os.path.exists(sysbench_dir):
+        os.makedirs(sysbench_dir)
+        sysbench_dir = "./sysbench"
+
+    u.transfer_file_from_ec2(manager_instance_id, "/home/ubuntu/sysbench_results_manager.txt", manager_file_path, pem_file_path)
+    u.transfer_file_from_ec2(worker_instance_id, "/home/ubuntu/sysbench_results_worker.txt", worker_file_path, pem_file_path)
+    u.transfer_file_from_ec2(worker_2_instance_id, "/home/ubuntu/sysbench_results_worker.txt", worker_2_file_path, pem_file_path)
+
+    #time.sleep(200)
+
+    # Create private security group
+    #private_sg = i.create_private_security_group(vpc_id, g.security_group_name2, security_group_id)                          
+    #i.update_instance_security_groups([manager_instance_id, trustedhost_instance_id, proxy_instance_id, worker_instance_id, worker_2_instance_id], [security_group_id])
 

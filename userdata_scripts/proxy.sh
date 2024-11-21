@@ -5,9 +5,6 @@ sudo apt update
 sudo apt upgrade -y
 sudo apt install -y python3 python3-pip
 
-# Install FastAPI, Uvicorn, and Requests with permission to override restrictions
-sudo pip3 install fastapi uvicorn requests --break-system-packages
-
 # Create the Proxy FastAPI app in /home/ubuntu
 cat << EOF > /home/ubuntu/proxy.py
 from fastapi import FastAPI, HTTPException
@@ -15,7 +12,7 @@ import requests
 import json
 import uvicorn
 import random
-import subprocess  # Added import
+import subprocess
 
 # Load Manager IP address from config.json
 with open('config.json') as config_file:
@@ -100,15 +97,13 @@ async def random_request(data: dict):
 
 @app.post("/custom")
 async def custom_request(data: dict):
-    # Prepare the data payload
-    payload = {"type": "custom", **data}
 
     operation = data.get("operation")
 
     if operation == "write":
         # Forward the write request
         try:
-            response = requests.post(f"http://{manager_private_ip}:5003/write", json=payload)
+            response = requests.post(f"http://{manager_private_ip}:5003/write", json=data)
             response.raise_for_status()
             return {"write": response.json()}
         except requests.RequestException as e:
@@ -131,7 +126,7 @@ async def custom_request(data: dict):
 
         # Forward the request to the worker with the lowest latency
         try:
-            response = requests.post(f"http://{best_worker_ip}:5003/read", json=payload)
+            response = requests.post(f"http://{best_worker_ip}:5003/read", json=data)
             response.raise_for_status()
             return {f"Read from {selected_worker} ": response.json()}
         except requests.RequestException as e:

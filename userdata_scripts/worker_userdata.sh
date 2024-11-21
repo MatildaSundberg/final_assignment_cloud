@@ -7,9 +7,7 @@ sudo apt install -y mysql-server python3-pip
 sudo apt-get update
 sudo apt-get install -y sysbench
 
-# Install FastAPI, Uvicorn, and Requests with permission to override the restriction
-sudo pip3 install fastapi uvicorn requests mysql-connector-python --break-system-packages
-
+# Start and enable MySQL service
 sudo systemctl start mysql
 sudo systemctl enable mysql
 
@@ -27,7 +25,7 @@ sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "FLUSH PRIVILEGES;"
 echo "Configuring MySQL as a replica..."
 RANDOM_SERVER_ID=$((RANDOM + 1))
 sudo sed -i '/bind-address/d' /etc/mysql/mysql.conf.d/mysqld.cnf
-sudo sed -i "/\[mysqld\]/a bind-address = 0.0.0.0\nlog_bin = /var/log/mysql/mysql-bin.log\nserver-id = $RANDOM_SERVER_ID\nbinlog_do_db = sakila" /etc/mysql/mysql.conf.d/mysqld.cnf
+sudo sed -i "/\[mysqld\]/a bind-address = 0.0.0.0\nlog_bin = /var/log/mysql/mysql-bin.log\nserver-id = $RANDOM_SERVER_ID" /etc/mysql/mysql.conf.d/mysqld.cnf
 
 # Restart MySQL to apply configuration changes
 sudo systemctl restart mysql
@@ -79,9 +77,6 @@ sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "START SLAVE;"
 echo "Checking replication status..."
 sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "SHOW SLAVE STATUS\G"
 
-# Run the benchmark and save results to a file
-#sudo sysbench /usr/share/sysbench/oltp_read_only.lua --mysql-db=sakila --mysql-user=root --mysql-password=$MYSQL_ROOT_PASSWORD run > sysbench_results_worker.txt
-
 # Write the FastAPI application to manager.py in the current directory
 cat << EOF > /home/ubuntu/worker.py
 from fastapi import FastAPI, HTTPException
@@ -132,3 +127,14 @@ async def read_operation(data: dict):
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5003)
 EOF
+
+echo "Preparing the Sakila database for benchmarking..."
+sudo sysbench /usr/share/sysbench/oltp_read_only.lua \
+  --mysql-db=sakila \
+  --mysql-user=root \
+  --mysql-password=$MYSQL_ROOT_PASSWORD \
+  prepare
+if [ $? -ne 0 ]; then
+    echo "Sysbench preparation failed. Exiting..."
+    exit 1
+fi

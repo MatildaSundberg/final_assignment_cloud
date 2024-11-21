@@ -5,10 +5,6 @@ sudo apt update
 sudo apt upgrade -y
 sudo apt install -y python3 python3-pip
 
-# Install FastAPI, Uvicorn, and Requests with permission to override restrictions
-sudo pip3 install fastapi uvicorn requests --break-system-packages
-
-
 # Create the Trusted Host FastAPI app in the current directory as trusted_host.py
 cat << EOF > /home/ubuntu/trusted_host.py
 from fastapi import FastAPI, HTTPException

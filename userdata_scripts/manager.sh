@@ -5,12 +5,9 @@ echo "Updating package list and installing MySQL server..."
 sudo apt update -y
 sudo apt install -y mysql-server python3-pip
 sudo apt-get update
-sudo apt-get install -y sysbench
 
 
-# Install FastAPI, Uvicorn, and Requests with permission to override the restriction
-sudo pip3 install fastapi uvicorn requests mysql-connector-python --break-system-packages
-
+# Start and enable MySQL service
 sudo systemctl start mysql
 sudo systemctl enable mysql
 
@@ -44,6 +41,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+
 # Enable MySQL binary logging for replication
 echo "Configuring MySQL for replication..."
 sudo sed -i '/bind-address/d' /etc/mysql/mysql.conf.d/mysqld.cnf
@@ -69,6 +67,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+
 sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" < sakila-db/sakila-schema.sql
 if [ $? -ne 0 ]; then
     echo "Failed to import Sakila schema. Exiting..."
@@ -82,16 +81,6 @@ if [ $? -ne 0 ]; then
 fi
 
 rm -rf sakila-db.tar.gz sakila-db
-
-# Prepare the database for benchmarking
-sudo sysbench /usr/share/sysbench/oltp_read_only.lua \
-  --mysql-db=sakila \
-  --mysql-user=root \
-  --mysql-password=$MYSQL_ROOT_PASSWORD \
-  prepare
-
-# Run the benchmark and save results to a file
-#sudo sysbench /usr/share/sysbench/oltp_read_only.lua --mysql-db=sakila --mysql-user=root --mysql-password=$MYSQL_ROOT_PASSWORD run > sysbench_results_manager.txt
 
 echo "Setup completed successfully."
 
@@ -121,6 +110,13 @@ def get_db_connection():
     except Error as e:
         print(f"Error connecting to MySQL: {e}")
         return None
+
+# Load IP address from config.json
+with open('config.json') as config_file:
+    config = json.load(config_file)
+
+WORKER_1_PRIVATE_IP = config.get("WORKER_1_PRIVATE_IP")
+WORKER_2_PRIVATE_IP = config.get("WORKER_2_PRIVATE_IP")
 
 @app.post("/read")
 async def read_operation(data: dict):
@@ -168,3 +164,16 @@ async def write_operation(data: dict):
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5003)
 EOF
+
+sudo apt-get install -y sysbench
+
+echo "Preparing the Sakila database for benchmarking..."
+sudo sysbench /usr/share/sysbench/oltp_read_only.lua \
+  --mysql-db=sakila \
+  --mysql-user=root \
+  --mysql-password=$MYSQL_ROOT_PASSWORD \
+  prepare
+if [ $? -ne 0 ]; then
+    echo "Sysbench preparation failed. Exiting..."
+    exit 1
+fi

@@ -5,9 +5,6 @@ sudo apt update
 sudo apt upgrade -y
 sudo apt install -y python3 python3-pip
 
-# Install FastAPI, Uvicorn, and Requests with permission to override the restriction
-sudo pip3 install fastapi uvicorn requests --break-system-packages
-
 
 # Write the FastAPI application to gatekeeper.py in the current directory
 cat << EOF > /home/ubuntu/gatekeeper.py

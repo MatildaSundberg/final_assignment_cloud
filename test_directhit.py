@@ -3,15 +3,19 @@ import requests
 import concurrent.futures
 import uuid
 import os
+from utils import util_functions as u
+
+# Get the IP addresses of the Gatekeeper instance
+gatekeeper_private_ip, gatekeeper_public_ip = u.get_instance_ips('Gatekeeper')
 
 # Configuration
-URL = "http://34.205.81.24:5000/directhit"  # Replace with actual Gatekeeper URL
+URL = f"http://{gatekeeper_public_ip}:5000/directhit"  # Replace with actual Gatekeeper URL
 AUTH_KEY = "safe-key"  # Authorization key for requests
 HEADERS = {"Content-Type": "application/json"}
 
 # Log file paths
-WRITE_LOG_FILE = "write_results_directhit.log"
-READ_LOG_FILE = "read_results_directhit.log"
+WRITE_LOG_FILE = "test_results/write_results_directhit.log"
+READ_LOG_FILE = "test_results/read_results_directhit.log"
 
 # Ensure log files are clean before starting
 if os.path.exists(WRITE_LOG_FILE):

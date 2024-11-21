@@ -6,8 +6,8 @@ import paramiko
 from utils import instance_setup as i
 import globals as g
 from utils import util_functions as u
-
 import logging
+
 logging.getLogger("paramiko").setLevel(logging.CRITICAL)
 
 if __name__ == "__main__":
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     with open('userdata_scripts/proxy.sh', 'r') as file:
         proxy_user_data = file.read()
 
-    # Create security group for instances
+    # Create public security group for instances
     security_group_id = i.createSecurityGroup(vpc_id, g.security_group_name)
 
     print("Creating instances...")
@@ -75,6 +75,7 @@ if __name__ == "__main__":
     print("Waiting for instances to initialize...")
     time.sleep(240)
 
+    # Get instance IPs
     gatekeeper_private_ip, gatekeeper_public_ip = u.get_instance_ips('Gatekeeper')
     trusted_host_private_ip, trusted_host_public_ip = u.get_instance_ips('Trusted-Host')
     proxy_private_ip, proxy_public_ip = u.get_instance_ips('Proxy')
@@ -110,6 +111,8 @@ if __name__ == "__main__":
         elif "Position:" in line:
             master_log_pos = line.split(":")[1].strip()
 
+    time.sleep(60)
+
     print(f"Retrieved MASTER_LOG_FILE: {master_log_file}, MASTER_LOG_POS: {master_log_pos}")
 
     # Update worker user data with retrieved information
@@ -128,72 +131,78 @@ if __name__ == "__main__":
     )
     time.sleep(60)
 
+    # Get worker instance IPs
     worker_1_private_ip, worker_1_public_ip = u.get_instance_ips('MySQL-Worker-1')
     worker_2_private_ip, worker_2_public_ip = u.get_instance_ips('MySQL-Worker-2')
+    print("Worker instances created.")
 
     time.sleep(60)
-
-
-    print("Worker instances created.")
 
     print(f"Gate IP: {gatekeeper_public_ip}")
     print(f"Trusted Host IP: {trusted_host_public_ip}")
     print(f"Proxy IP: {proxy_public_ip}")
 
-    #Set up `config.json` on the Gatekeeper instance with the IPs of Trusted Host and Proxy
+    #Set up `config.json` on the Gatekeeper instance with the needed IPs
     u.ssh_and_run_command(
         gatekeeper_public_ip, pem_file_path,
-        f"echo '{{\"TRUSTED_HOST_PRIVATE_IP\": \"{trusted_host_private_ip}\", \"PROXY_PRIVATE_IP\": \"{proxy_private_ip}\"}}' > config.json"
+        f"echo '{{\"TRUSTED_HOST_PRIVATE_IP\": \"{trusted_host_private_ip}\"}}' > config.json"
     )
 
-    # Set up `config.json` on the Trusted Host instance with the IP of the Proxy
+    # Set up `config.json` on the Trusted Host instance with the needed IPs
     u.ssh_and_run_command(
         trusted_host_public_ip, pem_file_path,
         f"echo '{{\"PROXY_PRIVATE_IP\": \"{proxy_private_ip}\", \"GATEKEEPER\": \"{gatekeeper_private_ip}\"}}' > config.json"
     )
 
-    # Set up `config.json` on the .. instance with the IP of the Proxy
+    # Set up `config.json` on the Proxy instance with the needed IPs
     u.ssh_and_run_command(
         proxy_public_ip, pem_file_path,
         f"echo '{{\"WORKER_1_PRIVATE_IP\": \"{worker_1_private_ip}\", \"WORKER_2_PRIVATE_IP\": \"{worker_2_private_ip}\", \"MANAGER_PRIVATE_IP\": \"{manager_private_ip}\"}}' > config.json"
     )
 
+    u.ssh_and_run_command(
+        manager_public_ip, pem_file_path,
+        f"echo '{{\"WORKER_1_PRIVATE_IP\": \"{worker_1_private_ip}\", \"WORKER_2_PRIVATE_IP\": \"{worker_2_private_ip}\"}}' > config.json"
+    )
+
     time.sleep(120)
 
 
-    # Start running .py files
+    # Start running .py files on the instances
     u.ssh_and_run_command(
         gatekeeper_public_ip, pem_file_path,
-        "nohup python3 gatekeeper.py > log.txt 2>&1 &"
+        "pip3 install fastapi uvicorn requests --break-system-packages && nohup python3 gatekeeper.py > log.txt 2>&1 &"
     )
 
     u.ssh_and_run_command(
         trusted_host_public_ip, pem_file_path,
-        "nohup python3 trusted_host.py > log.txt 2>&1 &"
+        "pip3 install fastapi uvicorn requests --break-system-packages && nohup python3 trusted_host.py > log.txt 2>&1 &"
     )
 
     u.ssh_and_run_command(
         proxy_public_ip, pem_file_path,
-        "nohup python3 proxy.py > log.txt 2>&1 &"
+        "pip3 install fastapi uvicorn requests --break-system-packages && nohup python3 proxy.py > log.txt 2>&1 &"
     )
 
     u.ssh_and_run_command(
         worker_1_public_ip, pem_file_path,
-        "nohup python3 worker.py > log.txt 2>&1 &"
+        "pip3 install fastapi uvicorn requests mysql-connector-python --break-system-packages && nohup python3 worker.py > log.txt 2>&1 &"
     )
 
     u.ssh_and_run_command(
         worker_2_public_ip, pem_file_path,
-        "nohup python3 worker.py > log.txt 2>&1 &"
+        "pip3 install fastapi uvicorn requests mysql-connector-python --break-system-packages && nohup python3 worker.py > log.txt 2>&1 &"
     ) 
 
     u.ssh_and_run_command(
         manager_public_ip, pem_file_path,
-        "nohup python3 manager.py > log.txt 2>&1 &"
+        "pip3 install fastapi uvicorn requests mysql-connector-python --break-system-packages && nohup python3 manager.py > log.txt 2>&1 &"
     )
+
 
     time.sleep(240)
 
+    # Run sysbench on the manager and worker instances
     u.ssh_and_run_command(
         manager_public_ip, pem_file_path,
         f"sudo sysbench /usr/share/sysbench/oltp_read_only.lua --mysql-db=sakila --mysql-user=root --mysql-password={MYSQL_ROOT_PASSWORD} run > sysbench_results_manager.txt"
@@ -207,17 +216,16 @@ if __name__ == "__main__":
         f"sudo sysbench /usr/share/sysbench/oltp_read_only.lua --mysql-db=sakila --mysql-user=root --mysql-password={MYSQL_ROOT_PASSWORD} run > sysbench_results_worker.txt"
     )
 
-    time.sleep(100)
+    time.sleep(200)
 
+    # Retrieve IDs for the instances
     manager_instance_id = u.retrieve_instance_id('MySQL-Manager')
     worker_instance_id = u.retrieve_instance_id('MySQL-Worker-1')
     worker_2_instance_id = u.retrieve_instance_id('MySQL-Worker-2')
     trustedhost_instance_id = u.retrieve_instance_id('Trusted-Host')
     proxy_instance_id = u.retrieve_instance_id('Proxy')
 
-
     sysbench_dir = "./sysbench"
-
     manager_file_path = os.path.join(sysbench_dir, "manager.txt")
     worker_file_path = os.path.join(sysbench_dir, "worker.txt")
     worker_2_file_path = os.path.join(sysbench_dir, "worker_2.txt")
@@ -227,13 +235,14 @@ if __name__ == "__main__":
         os.makedirs(sysbench_dir)
         sysbench_dir = "./sysbench"
 
+    # Transfer sysbench results to local machine
     u.transfer_file_from_ec2(manager_instance_id, "/home/ubuntu/sysbench_results_manager.txt", manager_file_path, pem_file_path)
     u.transfer_file_from_ec2(worker_instance_id, "/home/ubuntu/sysbench_results_worker.txt", worker_file_path, pem_file_path)
     u.transfer_file_from_ec2(worker_2_instance_id, "/home/ubuntu/sysbench_results_worker.txt", worker_2_file_path, pem_file_path)
 
-    #time.sleep(200)
+    time.sleep(200)
 
-    # Create private security group
-    #private_sg = i.create_private_security_group(vpc_id, g.security_group_name2, security_group_id)                          
-    #i.update_instance_security_groups([manager_instance_id, trustedhost_instance_id, proxy_instance_id, worker_instance_id, worker_2_instance_id], [security_group_id])
+    # Create private security group to secure the instances that are not supposed to be accessed from the outside
+    private_sg = i.create_private_security_group(vpc_id, g.security_group_name2, security_group_id)                          
+    i.update_instance_security_groups([manager_instance_id, trustedhost_instance_id, proxy_instance_id, worker_instance_id, worker_2_instance_id], [security_group_id])
 

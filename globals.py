@@ -9,6 +9,7 @@ key_pair_name = "A2_key_name"
 security_group_name = "A2-securitygroup-name"
 security_group_name2 = "A2-securitygroup-name2"
 
+# Password for MySQL root user
 mysql_root_password = "12345hej"
 
 

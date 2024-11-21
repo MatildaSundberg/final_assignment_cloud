@@ -3,6 +3,19 @@ import concurrent.futures
 import os
 from utils import util_functions as u
 
+"""
+Description:
+This script performs stress testing by sending 1000 concurrent write and read requests 
+to the Gatekeeper instance with the endpoint /random . The script inserts unique records into the `actor` table (write operation) 
+and retrieves them based on unique identifiers (read operation). Results of the operations are logged to 
+separate files for analysis.
+
+Outputs:
+    - Log files containing the results of write operations (`write_results_custom.log`).
+    - Log files containing the results of read operations (`read_results_custom.log`).
+
+"""
+
 # Get the IP addresses of the Gatekeeper instance
 gatekeeper_private_ip, gatekeeper_public_ip = u.get_instance_ips('Gatekeeper')
 

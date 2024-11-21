@@ -8,6 +8,24 @@ import globals as g
 from utils import util_functions as u
 import logging
 
+"""
+Description: 
+Main script to automate the provisioning and configuration of AWS EC2 instances for a distributed architecture. 
+This includes creating a key pair, configuring security groups, launching instances with specified roles, 
+and deploying applications via SSH. The script also sets up MySQL replication and runs performance benchmarks.
+
+Inputs: 
+    - Predefined configuration variables (e.g., key pair name, PEM file path, MySQL root password).
+    - User data scripts for instance initialization.
+
+Outputs: 
+    - EC2 instances, security groups, key pair, configured instances for Manager, Workers, Gatekeeper, Proxy, 
+      and Trusted Host roles.
+    - Deployed applications and locally stored performance benchmark results.
+"""
+
+
+
 logging.getLogger("paramiko").setLevel(logging.CRITICAL)
 
 if __name__ == "__main__":

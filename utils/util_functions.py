@@ -249,6 +249,7 @@ def get_orchestrator_instance_ip():
     print("No running orchestrator-instance found or the instance does not have a public IP address.")
     return None
 
+# Function to get the private and public IP addresses of an EC2 instance
 def get_instance_ips(name):
     ec2 = boto3.client('ec2')
     # Describe all running EC2 instances with the 'orchestrator-instance' tag
@@ -269,6 +270,7 @@ def get_instance_ips(name):
     private_ip = instance.get('PrivateIpAddress')
     return private_ip, public_ip
 
+# Function to retrieve the instance ID of an EC2 instance with a specific name
 def retrieve_instance_id(name):
     ec2 = boto3.client('ec2')
 
